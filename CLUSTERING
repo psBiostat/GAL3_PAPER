@@ -1,0 +1,111 @@
+```{r packages}
+library(tidyverse)
+library(bbcCorpo)
+library(dplyr)
+library(bbcPreprocessing)
+library(amap)
+library(mclust)
+library(factoextra)
+# library(bbcVerse)
+theme_set(theme_bbc())
+```
+
+
+```{r}
+load("CODE_GITHUB/SRC/DATA_TEST.RData")
+load("CODE_GITHUB/SRC/DATA_TRAINING.RData")
+```
+
+# CONCENSUS CLUSTERING
+
+## Filter on 4000 most variant genes
+
+```{r}
+DATA_TRAINING_CLUSTERING <- filter_top_stat(DATA_TRAINING, stat="cv", k=4000)
+DATA_TRAINING_CLUSTERING_SCALE <- bbcWrangling:::scale.ExpressionSet(DATA_TRAINING_CLUSTERING)
+
+EXPRS <- exprs(DATA_TRAINING_CLUSTERING)
+EXPRS_SCALE <- exprs(DATA_TRAINING_CLUSTERING_SCALE)
+```
+
+## Clustering
+
+```{r}
+NBR_CLUSTER <- list(2,3,4)
+```
+
+
+### Hierarchical clustering
+
+
+```{r}
+
+HCLUST <- hcluster(t(EXPRS_SCALE), method="euclidean", link="ward")
+
+HCLUST_CLUSTERS <- purrr::map(NBR_CLUSTER, function(.x){
+  CLUSTERS <- cutree(HCLUST,.x)
+  DATA_CLUSTER <- data.frame(OMICID = names(CLUSTERS),
+                             HCLUST_CLUSTERS = CLUSTERS)
+  return(DATA_CLUSTER)
+  
+})
+
+
+```
+
+
+### mclust
+
+```{r}
+MCLUST_CLUSTERS <- purrr::map(NBR_CLUSTER, function(.x){
+  CLUSTERS <- Mclust(t(EXPRS), G = .x)
+  DATA_CLUSTER <- data.frame(OMICID = names(CLUSTERS$classification),
+                             MCLUST_CLUSTERS = CLUSTERS$classification)
+  return(DATA_CLUSTER)
+  
+})
+
+```
+
+
+### kmeans
+
+```{r}
+KMEANS_CLUSTERS <- purrr::map(NBR_CLUSTER, function(.x){
+  CLUSTERS <- kmeans(t(EXPRS), .x, iter.max = 10, nstart = 1, trace=FALSE)
+  DATA_CLUSTER <- data.frame(OMICID = names(CLUSTERS$cluster),
+                             KMEANS_CLUSTERS = CLUSTERS$cluster)
+  return(DATA_CLUSTER)
+  
+})
+
+
+```
+
+
+## Consensus
+
+
+```{r}
+CLUSTERING <- list(CLUSTERS2 = 1, 
+                   CLUSTERS3 = 2, 
+                   CLUSTERS4 = 3)
+
+CLUSTERING <- purrr::map(CLUSTERING, function(.x){
+  DATA <- left_join(HCLUST_CLUSTERS[[.x]], MCLUST_CLUSTERS[[.x]], by="OMICID")
+  left_join(DATA, KMEANS_CLUSTERS[[.x]], by="OMICID")
+})
+
+```
+
+
+```{r}
+CONSENSUS_CLUSTERING <- purrr::map(CLUSTERING, function(.x){
+  con4<-xtabs(~HCLUST_CLUSTERS + MCLUST_CLUSTERS + KMEANS_CLUSTERS, data=.x)
+ftable(con4)
+})
+```
+
+
+
+
