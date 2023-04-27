@@ -12,8 +12,8 @@ theme_set(theme_bbc())
 
 
 ```{r}
-load("CODE_GITHUB/SRC/DATA_TEST.RData")
-load("CODE_GITHUB/SRC/DATA_TRAINING.RData")
+load("SRC/DATA_TEST.RData")
+load("SRC/DATA_TRAINING.RData")
 ```
 
 # CONCENSUS CLUSTERING
